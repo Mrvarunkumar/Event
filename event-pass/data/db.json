@@ -1,0 +1,14 @@
+{
+  "event": {
+    "name": "TechNova 2026",
+    "tagline": "Innovate. Build. Celebrate.",
+    "description": "The annual inter-department tech fest: hackathon, robotics arena, paper presentations and a live cultural night. Register now and get your digital entry pass.",
+    "date": "2026-12-18",
+    "time": "09:30",
+    "venue": "Main Auditorium, College Campus",
+    "organizer": "Student Council"
+  },
+  "registrations": [],
+  "counter": 5,
+  "invalidScans": 0
+}

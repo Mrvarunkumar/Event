@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Login | EVENT PASS</title><meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin">
+<main class="login-wrap">
+  <form class="card login-card" id="login-form" novalidate>
+    <a class="brand" href="index.html"><svg class="ic"><use href="#i-logo"/></svg>EVENT PASS</a>
+    <h1>Admin sign in</h1><p style="color:var(--muted-fg)">Authorised event staff only.</p>
+    <div class="form-error hidden" id="login-error" role="alert" style="margin-top:1rem"></div>
+    <div class="field"><label for="username">Username</label><input id="username" autocomplete="username" required autofocus></div>
+    <div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
+    <button class="btn btn-primary" id="login-btn" type="submit" style="width:100%;margin-top:1.4rem">Sign in</button>
+    <p style="text-align:center;margin-top:1rem"><a href="index.html">← Back to registration</a></p>
+  </form>
+</main>
+<script src="js/icons.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>

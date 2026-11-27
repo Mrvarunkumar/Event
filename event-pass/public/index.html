@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EVENT PASS - Register & get your QR entry pass</title>
+<meta name="description" content="Register for the college event and get a unique QR digital entry pass.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="nav"><div class="container">
+  <a class="brand" href="index.html"><svg class="ic"><use href="#i-logo"/></svg>EVENT PASS</a>
+  <nav class="nav-links" aria-label="Main"><a href="#about">About</a><a href="login.html">Admin</a><a class="btn btn-accent btn-sm" href="#register">Register Now</a></nav>
+</div></header>
+
+<main>
+<section class="hero" id="top" style="padding-bottom:6rem"><div class="container">
+  <svg class="ic hero-logo reveal" role="img" aria-label="Event logo"><use href="#i-logo"/></svg>
+  <span class="eyebrow reveal" data-ev="organizer">Student Council</span>
+  <h1 class="reveal" data-ev="name">Loading…</h1>
+  <p class="tagline reveal" data-ev="tagline"></p>
+  <p class="desc reveal" data-ev="description"></p>
+  <div class="chips reveal">
+    <span class="chip"><svg class="ic"><use href="#i-cal"/></svg><span data-ev="dateFmt">—</span></span>
+    <span class="chip"><svg class="ic"><use href="#i-clock"/></svg><span data-ev="timeFmt">—</span></span>
+    <span class="chip"><svg class="ic"><use href="#i-pin"/></svg><span data-ev="venue">—</span></span>
+  </div>
+  <a class="btn btn-accent reveal" href="#register">Register Now</a>
+</div></section>
+
+<div class="container"><div class="countdown" id="countdown" aria-label="Time left until the event" role="timer">
+  <div class="cd"><b id="cd-d">--</b><span>Days</span></div><div class="cd"><b id="cd-h">--</b><span>Hours</span></div>
+  <div class="cd"><b id="cd-m">--</b><span>Mins</span></div><div class="cd"><b id="cd-s">--</b><span>Secs</span></div>
+</div></div>
+
+<section id="about"><div class="container">
+  <h2 class="section-title">How it works</h2><p class="section-sub">Three quick steps to a smooth entry.</p>
+  <div class="steps">
+    <div class="card step"><b>1. Register</b><p>Fill in the short form below with your details.</p></div>
+    <div class="card step"><b>2. Get your QR pass</b><p>A unique digital pass is generated instantly. Download or print it.</p></div>
+    <div class="card step"><b>3. Scan &amp; enter</b><p>Show the QR at the entrance. It is scanned once and you're in.</p></div>
+  </div>
+</div></section>
+
+<section id="register" style="padding-top:0"><div class="container" style="max-width:760px">
+  <h2 class="section-title">Register for the event</h2><p class="section-sub">One registration per email and phone number.</p>
+  <form class="card" id="reg-form" novalidate>
+    <div class="form-error hidden" id="form-error" role="alert"></div>
+    <div class="form-grid">
+      <div class="field full"><label for="name">Full Name</label><input id="name" name="name" autocomplete="name" required maxlength="80"><p class="err"></p></div>
+      <div class="field"><label for="usn">USN / Registration No. <small>(optional)</small></label><input id="usn" name="usn" autocapitalize="characters" maxlength="20"><p class="err"></p></div>
+      <div class="field"><label for="branch">Department / Branch</label><select id="branch" name="branch" required><option value="">Select…</option></select><p class="err"></p></div>
+      <div class="field"><label for="phone">Phone Number</label><input id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="10-digit mobile" required><p class="err"></p></div>
+      <div class="field"><label for="email">Email Address</label><input id="email" name="email" type="email" autocomplete="email" required><p class="err"></p></div>
+      <div class="full"><button class="btn btn-primary" id="submit-btn" type="submit" style="width:100%">Register &amp; Generate Pass</button></div>
+    </div>
+  </form>
+</div></section>
+
+<section id="pass-section" class="hidden" style="background:var(--muted)"><div class="container">
+  <h2 class="section-title" style="text-align:center">You're registered!</h2><p class="section-sub" style="text-align:center">Save your pass. You will need the QR code at the entrance.</p>
+  <div class="pass-wrap">
+    <article class="pass" id="pass" aria-label="Entry pass">
+      <div class="pass-head"><svg class="ic"><use href="#i-logo"/></svg><div><small>Entry Pass</small><strong data-ev="name">Event</strong></div></div>
+      <div class="pass-body">
+        <div class="pass-name" id="p-name"></div>
+        <div class="pass-meta">
+          <div><span>Registration ID</span><b id="p-id"></b></div><div><span>Branch</span><b id="p-branch"></b></div>
+          <div><span>Date</span><b data-ev="dateShort"></b></div><div><span>Time</span><b data-ev="timeFmt"></b></div>
+          <div style="grid-column:1/-1"><span>Venue</span><b data-ev="venue"></b></div>
+        </div>
+        <div class="qr-box"><canvas id="qr" width="480" height="480" role="img" aria-label="Your unique QR code"></canvas></div>
+        <div class="pass-foot"><span class="badge badge-registered" id="p-status">REGISTERED</span><small style="color:var(--muted-fg)">Valid for one entry</small></div>
+      </div>
+    </article>
+    <div class="pass-actions">
+      <button class="btn btn-primary" id="dl-png"><svg class="ic"><use href="#i-download"/></svg>QR Code (PNG)</button>
+      <button class="btn btn-primary" id="dl-pdf"><svg class="ic"><use href="#i-download"/></svg>Entry Pass (PDF)</button>
+      <button class="btn btn-ghost" id="print"><svg class="ic"><use href="#i-print"/></svg>Print Pass</button>
+    </div>
+    <p class="notice">Your QR holds only a secure random token, not your personal details. Don't share it: it works for a single entry.</p>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="container"><p>© <span id="yr"></span> EVENT PASS · <span data-ev="organizer"></span> · <a href="login.html">Admin login</a></p></div></footer>
+<div id="toasts" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

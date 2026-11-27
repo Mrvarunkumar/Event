@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard | EVENT PASS Admin</title><meta name="robots" content="noindex">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin">
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="dashboard.html"><svg class="ic"><use href="#i-logo"/></svg>EVENT PASS</a>
+    <div role="tablist" aria-label="Sections" style="display:contents">
+      <button class="tab" role="tab" data-tab="participants" aria-selected="true"><svg class="ic"><use href="#i-users"/></svg><span>Participants</span></button>
+      <button class="tab" role="tab" data-tab="scanner" aria-selected="false"><svg class="ic"><use href="#i-scan"/></svg><span>Scan &amp; Verify</span></button>
+      <button class="tab" role="tab" data-tab="event" aria-selected="false"><svg class="ic"><use href="#i-sliders"/></svg><span>Event Details</span></button>
+    </div>
+    <div class="spacer"></div>
+    <button class="tab" id="logout"><svg class="ic"><use href="#i-logout"/></svg><span>Logout</span></button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><h1 id="page-title">Participants</h1><span id="who" style="color:var(--muted-fg);font-weight:600"></span></div>
+
+    <div class="stats" aria-label="Statistics">
+      <div class="card stat"><svg class="ic"><use href="#i-users"/></svg><div><b id="s-total">0</b><span>Total Registrations</span></div></div>
+      <div class="card stat ok"><svg class="ic"><use href="#i-check"/></svg><div><b id="s-verified">0</b><span>Verified Participants</span></div></div>
+      <div class="card stat warn"><svg class="ic"><use href="#i-clock"/></svg><div><b id="s-pending">0</b><span>Pending Participants</span></div></div>
+      <div class="card stat bad"><svg class="ic"><use href="#i-ban"/></svg><div><b id="s-rejected">0</b><span>Rejected / Invalid QR</span></div></div>
+    </div>
+
+    <section class="panel" id="panel-participants" style="padding:0">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search name, ID, email, phone, USN" aria-label="Search participants">
+        <select id="f-branch" aria-label="Filter by branch"><option value="">All branches</option></select>
+        <select id="f-status" aria-label="Filter by status"><option value="">All statuses</option><option value="verified">Verified</option><option value="pending">Pending</option><option value="revoked">Revoked</option></select>
+        <a class="btn btn-ghost" href="/api/admin/export.csv" download><svg class="ic"><use href="#i-download"/></svg>Export CSV</a>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Reg. ID</th><th>Name</th><th>Branch</th><th>Phone</th><th>Email</th><th>Registered</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table><div class="empty hidden" id="empty">No participants match.</div></div>
+    </section>
+
+    <section class="panel" id="panel-scanner" hidden style="padding:0">
+      <div class="scan-grid">
+        <div class="card">
+          <div id="reader"><p style="padding:1rem">Camera is off. Press <b>Start Scanner</b>.<br><small>Camera needs HTTPS or localhost.</small></p></div>
+          <div class="scan-actions">
+            <button class="btn btn-primary" id="scan-start"><svg class="ic"><use href="#i-scan"/></svg>Start Scanner</button>
+            <button class="btn btn-ghost hidden" id="scan-stop">Stop</button>
+          </div>
+          <form class="manual" id="manual"><input id="manual-token" placeholder="Or paste QR token manually" aria-label="QR token" autocomplete="off"><button class="btn btn-ghost" type="submit">Verify</button></form>
+        </div>
+        <div>
+          <div class="result" id="result" role="status" aria-live="assertive"><h2 style="color:var(--muted-fg)">Waiting for scan…</h2></div>
+          <ul class="recent" id="recent" aria-label="Recent scans"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-event" hidden style="padding:0">
+      <form class="card" id="event-form" novalidate style="max-width:760px">
+        <div class="form-grid">
+          <div class="field full"><label for="e-name">Event name</label><input id="e-name" name="name" maxlength="100" required></div>
+          <div class="field full"><label for="e-tagline">Tagline</label><input id="e-tagline" name="tagline" maxlength="140"></div>
+          <div class="field full"><label for="e-description">Description</label><textarea id="e-description" name="description" maxlength="600"></textarea></div>
+          <div class="field"><label for="e-date">Date</label><input id="e-date" name="date" type="date" required></div>
+          <div class="field"><label for="e-time">Time</label><input id="e-time" name="time" type="time" required></div>
+          <div class="field"><label for="e-venue">Venue</label><input id="e-venue" name="venue" maxlength="140" required></div>
+          <div class="field"><label for="e-organizer">Organizer</label><input id="e-organizer" name="organizer" maxlength="100"></div>
+          <div class="full"><button class="btn btn-primary" type="submit">Save changes</button></div>
+        </div>
+      </form>
+    </section>
+  </main>
+</div>
+
+<dialog id="dlg"><div class="dlg"><h2>Participant details</h2><dl id="dlg-body"></dl><div class="row"><button class="btn btn-ghost" id="dlg-close">Close</button></div></div></dialog>
+<div id="toasts" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

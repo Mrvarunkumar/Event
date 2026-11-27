@@ -1,7 +1,7 @@
 /* EVENT PASS - public site: event info, registration, QR pass */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-let EVENT = null, PASS = null;
+let EVENT = null, PASS = null, refreshing = false;
 const KEY = 'eventpass:pass';
 
 function toast(msg, type = '') {
@@ -28,6 +28,31 @@ function tick() {
   const v = Math.max(0, diff), p = (n) => String(n).padStart(2, '0');
   $('#cd-d').textContent = p(Math.floor(v / 864e5)); $('#cd-h').textContent = p(Math.floor(v / 36e5) % 24);
   $('#cd-m').textContent = p(Math.floor(v / 6e4) % 60); $('#cd-s').textContent = p(Math.floor(v / 1e3) % 60);
+}
+/* Load (or reload) event details; retry automatically if the server was down. */
+async function refreshEvent() {
+  if (refreshing) return;
+  refreshing = true;
+  try {
+    const { event, branches } = await api('/api/event');
+    if (!event || !event.name) throw new Error('Invalid event data');
+    const changed = !EVENT || JSON.stringify(event) !== JSON.stringify(EVENT);
+    EVENT = event;
+    if (changed) { fillEvent(); tick(); }
+    if (Array.isArray(branches) && $('#branch').options.length === 1)
+      branches.forEach(b => $('#branch').append(new Option(b, b)));
+    $('#api-error').classList.add('hidden');
+  } catch (err) {
+    const box = $('#api-error');
+    if (box) {
+      const wrongHost = location.protocol === 'file:' || err?.status === 404 || err?.message === 'Invalid event data';
+      box.textContent = wrongHost
+        ? 'Open this page from the app server (http://localhost:3000 or your deployed URL), not as a plain file.'
+        : 'Cannot reach the event server yet. Retrying automatically…';
+      box.classList.remove('hidden');
+    }
+    /* keep the values rendered by the server if the API is unavailable */
+  } finally { refreshing = false; }
 }
 
 /* ---- validation (mirrors the server) ---- */
@@ -85,12 +110,12 @@ $('#dl-pdf').onclick = () => {
 /* ---- init & submit ---- */
 (async function init() {
   $('#yr').textContent = new Date().getFullYear();
-  try {
-    const { event, branches } = await api('/api/event'); EVENT = event;
-    branches.forEach(b => $('#branch').append(new Option(b, b)));
-    fillEvent(); tick(); setInterval(tick, 1000);
-  } catch { toast('Could not load event details. Is the server running?', 'bad'); return; }
-  try { const saved = JSON.parse(localStorage.getItem(KEY)); if (saved?.token) showPass(saved); } catch {}
+  await refreshEvent();                       // keeps retrying if the server starts late
+  setInterval(tick, 1000);
+  setInterval(refreshEvent, 15000);
+  window.addEventListener('focus', refreshEvent);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshEvent(); });
+  try { const saved = JSON.parse(localStorage.getItem(KEY)); if (saved?.token && EVENT) showPass(saved); } catch {}
 })();
 
 Object.keys(rules).forEach(n => { $('#' + n).addEventListener('blur', () => check(n)); $('#' + n).addEventListener('input', () => $('#' + n).closest('.field').classList.contains('invalid') && check(n)); });

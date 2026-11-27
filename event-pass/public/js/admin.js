@@ -123,7 +123,11 @@ async function loadEvent() {
 }
 $('#event-form').onsubmit = async (e) => {
   e.preventDefault();
-  try { await api('/api/admin/event', 'PUT', Object.fromEntries(new FormData(e.target))); toast('Event details saved.', 'ok'); }
+  try {
+    await api('/api/admin/event', 'PUT', Object.fromEntries(new FormData(e.target)));
+    await loadEvent();   // reload from the server so the form shows what was really saved
+    toast('Event details saved. The public page updates automatically.', 'ok');
+  }
   catch (err) { toast(err.data?.errors ? 'Please fill all required fields.' : err.message, 'bad'); }
 };
 

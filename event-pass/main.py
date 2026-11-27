@@ -8,6 +8,7 @@ import copy
 import csv
 import hashlib
 import hmac
+import html
 import io
 import json
 import os
@@ -21,7 +22,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path as PathParam, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -145,17 +146,20 @@ def _sync_supabase() -> None:
     _REMOTE_REG_IDS = set(local_ids)
 
 
-def save_db() -> None:
+def save_db() -> bool:
+    """Persist changes. Returns False when Supabase was configured but failed."""
+    saved_to_supabase = False
     if USE_SUPABASE and _SB is not None:
         try:
             _sync_supabase()
-            return
+            saved_to_supabase = True
         except Exception as exc:
             print(f"[EVENT PASS] Supabase save failed: {exc}; writing db.json instead")
     DATA_DIR.mkdir(exist_ok=True)
     tmp = DB_FILE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(DB, indent=2), encoding="utf-8")
     os.replace(tmp, DB_FILE)
+    return saved_to_supabase or not (USE_SUPABASE and _SB is not None)
 
 
 def load_db() -> dict:
@@ -204,6 +208,30 @@ if _MIGRATE_LOCAL:                       # push old db.json rows up on first Sup
         save_db()
     except Exception as exc:
         print(f"[EVENT PASS] Could not migrate local registrations: {exc}")
+
+
+def refresh_event_from_supabase() -> None:
+    """Read the latest event row so every page/server instance sees the same details.
+
+    Without this, a change made in one process (or directly in Supabase) stays
+    invisible to any other process until it is restarted, because the event is
+    otherwise only loaded once at startup.
+    """
+    global _EVENT_ROW_ID
+    if not (USE_SUPABASE and _SB is not None):
+        return
+    try:
+        rows = _SB.table("events").select("*").limit(1).execute().data or []
+    except Exception as exc:
+        print(f"[EVENT PASS] Supabase event refresh failed: {exc}")
+        return
+    if not rows:
+        return
+    event = _event_from_row(rows[0])
+    _EVENT_ROW_ID = rows[0].get("id")
+    with db_lock:
+        DB["event"] = event
+
 
 # --------------------------------------------------------------------------- sessions / throttling
 SESSIONS: dict = {}   # token -> expiry (epoch seconds)
@@ -348,6 +376,7 @@ async def bad_request(request: Request, exc: RequestValidationError):
 # --------------------------------------------------------------------------- public API
 @app.get("/api/event")
 def get_event():
+    refresh_event_from_supabase()
     return {"event": DB["event"], "branches": BRANCHES}
 
 
@@ -454,8 +483,16 @@ def update_event(body: EventIn):
     if errors:
         return JSONResponse({"errors": errors}, status_code=422)
     with db_lock:
+        previous = DB["event"]
         DB["event"] = ev
-        save_db()
+        saved = save_db()
+        if not saved:
+            DB["event"] = previous
+    if not saved:
+        return JSONResponse(
+            {"error": "Could not save to Supabase. Check the server logs and try again."},
+            status_code=500,
+        )
     return {"event": ev}
 
 
@@ -539,6 +576,47 @@ app.include_router(admin)
 
 
 # --------------------------------------------------------------------------- pages
+def _event_display(ev: dict) -> dict:
+    """Build the same formatted values the browser creates from the raw event fields."""
+    try:
+        d = datetime.strptime(ev.get("date") or "", "%Y-%m-%d")
+        date_fmt = f"{d.strftime('%A')}, {d.day} {d.strftime('%B')} {d.year}"
+        date_short = f"{d.day} {d.strftime('%b')} {d.year}"
+    except ValueError:
+        date_fmt = date_short = ""
+    try:
+        t = datetime.strptime(ev.get("time") or "", "%H:%M")
+        time_fmt = f"{t.hour % 12 or 12}:{t.minute:02d} {'AM' if t.hour < 12 else 'PM'}"
+    except ValueError:
+        time_fmt = ""
+    return {**ev, "dateFmt": date_fmt, "dateShort": date_short, "timeFmt": time_fmt}
+
+
+def render_index() -> str:
+    """Fill the public page's placeholders on the server so 'Loading…' never appears."""
+    values = _event_display(DB["event"])
+    source = (PUBLIC / "index.html").read_text(encoding="utf-8")
+    pattern = re.compile(r'(<[^>]*\bdata-ev="([^"]+)"[^>]*>)[^<]*(</[^>]+>)')
+
+    def replace(match: re.Match) -> str:
+        return match.group(1) + html.escape(str(values.get(match.group(2), ""))) + match.group(3)
+
+    rendered = pattern.sub(replace, source)
+    rendered = re.sub(
+        r"<title>.*?</title>",
+        f"<title>{html.escape(values['name'])} | EVENT PASS</title>",
+        rendered, count=1, flags=re.S,
+    )
+    return rendered
+
+
+@app.get("/", include_in_schema=False)
+@app.get("/index.html", include_in_schema=False)
+def index_page():
+    refresh_event_from_supabase()
+    return HTMLResponse(render_index())
+
+
 @app.get("/admin", include_in_schema=False)
 @app.get("/admin/", include_in_schema=False)
 def admin_redirect():

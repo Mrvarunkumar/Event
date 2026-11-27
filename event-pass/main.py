@@ -50,7 +50,8 @@ def _h(value: str) -> bytes:
 
 USER_HASH, PASS_HASH = _h(ADMIN_USER), _h(ADMIN_PASS)
 
-# --------------------------------------------------------------------------- tiny JSON database
+# --------------------------------------------------------------------------- database
+# Supabase is used when .env has credentials; db.json is the offline fallback.
 DEFAULT_DB = {
     "event": {
         "name": "TechNova 2026",
@@ -64,15 +65,131 @@ DEFAULT_DB = {
 }
 db_lock = threading.RLock()
 
+try:
+    from db import URL as SUPABASE_URL, KEY as SUPABASE_KEY, get_client
+except ImportError:                       # supabase / dotenv not installed yet
+    SUPABASE_URL = SUPABASE_KEY = None
+    get_client = None
+
+USE_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY)
+if USE_SUPABASE and any("YOUR_" in str(v).upper() for v in (SUPABASE_URL, SUPABASE_KEY)):
+    print("[EVENT PASS] .env still has placeholder values! "
+          "Replace SUPABASE_URL and SUPABASE_KEY with real values from Supabase -> Project Settings -> API.")
+    USE_SUPABASE = False
+_SB = get_client() if USE_SUPABASE else None
+_EVENT_ROW_ID = None
+_REMOTE_REG_IDS: set = set()
+_MIGRATE_LOCAL = False   # copy old db.json registrations into Supabase once
+
+
+def _event_from_row(row: dict) -> dict:
+    return {
+        "name": row.get("name") or "", "tagline": row.get("tagline") or "",
+        "description": row.get("description") or "",
+        "date": str(row.get("event_date") or "")[:10],
+        "time": str(row.get("start_time") or "")[:5],
+        "venue": row.get("venue") or "", "organizer": row.get("organizer") or "",
+    }
+
+
+def _event_to_row(ev: dict) -> dict:
+    return {
+        "name": ev.get("name") or DEFAULT_DB["event"]["name"],
+        "tagline": ev.get("tagline") or "",
+        "description": ev.get("description") or "",
+        "event_date": ev.get("date") or DEFAULT_DB["event"]["date"],
+        "start_time": ev.get("time") or DEFAULT_DB["event"]["time"],
+        "venue": ev.get("venue") or DEFAULT_DB["event"]["venue"],
+        "organizer": ev.get("organizer") or "",
+    }
+
+
+def _reg_from_row(row: dict) -> dict:
+    return {
+        "id": row["id"], "token": row["token"],
+        "name": row.get("name") or "", "usn": row.get("usn") or "",
+        "branch": row.get("branch") or "", "phone": row.get("phone") or "",
+        "email": row.get("email") or "", "status": row.get("status") or "pending",
+        "registeredAt": row.get("registered_at"), "verifiedAt": row.get("verified_at"),
+    }
+
+
+def _reg_to_row(reg: dict) -> dict:
+    return {
+        "id": reg["id"], "token": reg["token"],
+        "name": reg.get("name") or "", "usn": reg.get("usn") or "",
+        "branch": reg.get("branch") or "", "phone": reg.get("phone") or "",
+        "email": reg.get("email") or "", "status": reg.get("status") or "pending",
+        "registered_at": reg.get("registeredAt") or now_iso(),
+        "verified_at": reg.get("verifiedAt"),
+    }
+
+
+def _sync_supabase() -> None:
+    """Push the in-memory DB to Supabase (upsert changed rows, delete removed ones)."""
+    global _EVENT_ROW_ID, _REMOTE_REG_IDS
+    regs = DB["registrations"]
+    local_ids = {r["id"] for r in regs}
+    if regs:
+        _SB.table("registrations").upsert([_reg_to_row(r) for r in regs], on_conflict="id").execute()
+    for reg_id in _REMOTE_REG_IDS - local_ids:
+        _SB.table("registrations").delete().eq("id", reg_id).execute()
+
+    event_row = _event_to_row(DB["event"])
+    if _EVENT_ROW_ID:
+        _SB.table("events").update(event_row).eq("id", _EVENT_ROW_ID).execute()
+    else:
+        result = _SB.table("events").insert(event_row).execute()
+        if result.data:
+            _EVENT_ROW_ID = result.data[0].get("id")
+    _REMOTE_REG_IDS = set(local_ids)
+
 
 def save_db() -> None:
+    if USE_SUPABASE and _SB is not None:
+        try:
+            _sync_supabase()
+            return
+        except Exception as exc:
+            print(f"[EVENT PASS] Supabase save failed: {exc}; writing db.json instead")
+    DATA_DIR.mkdir(exist_ok=True)
     tmp = DB_FILE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(DB, indent=2), encoding="utf-8")
     os.replace(tmp, DB_FILE)
 
 
 def load_db() -> dict:
+    global _EVENT_ROW_ID, _REMOTE_REG_IDS, _MIGRATE_LOCAL
     DATA_DIR.mkdir(exist_ok=True)
+    if USE_SUPABASE and _SB is not None:
+        try:
+            event_rows = _SB.table("events").select("*").limit(1).execute().data or []
+            reg_rows = _SB.table("registrations").select("*").execute().data or []
+            data = copy.deepcopy(DEFAULT_DB)
+            if event_rows:
+                data["event"] = _event_from_row(event_rows[0])
+                _EVENT_ROW_ID = event_rows[0].get("id")
+            data["registrations"] = [_reg_from_row(r) for r in reg_rows]
+            # One-time migration: keep registrations made while db.json was in use.
+            try:
+                local = json.loads(DB_FILE.read_text(encoding="utf-8")).get("registrations", [])
+                known = {r["id"] for r in data["registrations"]}
+                for reg in local:
+                    if reg.get("id") and reg["id"] not in known:
+                        data["registrations"].append(reg)
+                        known.add(reg["id"])
+                        _MIGRATE_LOCAL = True
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+            data["counter"] = max(
+                [int(r["id"][3:]) for r in data["registrations"]
+                 if r["id"].startswith("EP-") and r["id"][3:].isdigit()] or [0]
+            )
+            _REMOTE_REG_IDS = {r["id"] for r in data["registrations"]}
+            print(f"[EVENT PASS] Supabase connected: {len(data['registrations'])} registrations loaded")
+            return data
+        except Exception as exc:
+            print(f"[EVENT PASS] Supabase load failed: {exc}; using db.json")
     try:
         return json.loads(DB_FILE.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
@@ -82,6 +199,11 @@ def load_db() -> dict:
 
 
 DB = load_db()
+if _MIGRATE_LOCAL:                       # push old db.json rows up on first Supabase start
+    try:
+        save_db()
+    except Exception as exc:
+        print(f"[EVENT PASS] Could not migrate local registrations: {exc}")
 
 # --------------------------------------------------------------------------- sessions / throttling
 SESSIONS: dict = {}   # token -> expiry (epoch seconds)
@@ -295,6 +417,18 @@ def stats():
     count = lambda s: sum(1 for r in regs if r["status"] == s)
     return {"total": len(regs), "verified": count("verified"), "pending": count("pending"),
             "rejected": count("revoked") + DB["invalidScans"]}
+
+
+@admin.post("/reset")
+def reset_all():
+    """Delete every registration and restore the default event details."""
+    with db_lock:
+        DB["registrations"] = []
+        DB["counter"] = 0
+        DB["invalidScans"] = 0
+        DB["event"] = copy.deepcopy(DEFAULT_DB["event"])
+        save_db()
+    return {"ok": True, "message": "All registrations deleted and event details reset."}
 
 
 @admin.get("/participants")

@@ -11,6 +11,7 @@ body.admin{background:#F4F1FB}
 .tab{display:flex;align-items:center;gap:.7rem;min-height:48px;padding:.6rem .9rem;border:0;border-radius:12px;background:transparent;color:#DDD6FE;font:600 1rem var(--font);cursor:pointer;text-align:left;transition:background .2s}
 .tab:hover{background:rgba(255,255,255,.1)}.tab[aria-selected=true]{background:var(--primary);color:#fff}
 .side .spacer{flex:1}
+.side .tab.danger{color:#FCA5A5}.side .tab.danger:hover{background:rgba(239,68,68,.18)}
 .main{padding:clamp(1rem,3vw,2rem);min-width:0}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem}.topbar h1{font-size:1.7rem;font-weight:800}
 .panel[hidden]{display:none}

@@ -26,6 +26,19 @@ function showTab(t) {
 $$('.tab[data-tab]').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $('#logout').onclick = async () => { await api('/api/admin/logout', 'POST').catch(() => {}); location.href = 'login.html'; };
 
+/* ---- reset all data ---- */
+$('#reset-all').onclick = async () => {
+  if (!confirm('Delete ALL registrations and restore the default event details?\n\nThis also removes them from Supabase and cannot be undone.')) return;
+  if ((prompt('Type RESET to confirm:') || '').trim().toUpperCase() !== 'RESET') return toast('Reset cancelled.');
+  try {
+    const r = await api('/api/admin/reset', 'POST');
+    toast(r.message || 'All data reset.', 'ok');
+    people = []; $('#search').value = ''; $('#f-branch').value = ''; $('#f-status').value = '';
+    $('#recent').replaceChildren();
+    await Promise.all([loadPeople(), loadStats(), loadEvent()]);
+  } catch (e) { toast(e.message, 'bad'); }
+};
+
 /* ---- stats & table ---- */
 async function loadStats() {
   const s = await api('/api/admin/stats');

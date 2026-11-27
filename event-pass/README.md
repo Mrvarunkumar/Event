@@ -35,6 +35,26 @@ Restart the server after creating `.env`. On startup the console prints:
 the error and falls back to `db.json` — check that the key is the **service_role** key and that
 `schema.sql` was run in the same Supabase project.
 
+## Deploy to Render
+The repo root contains `render.yaml` (Render Blueprint), so deployment needs no manual commands.
+
+1. Push this repo to GitHub/GitLab.
+2. Render Dashboard → **New + → Blueprint** → connect the repo → **Apply**.
+3. In the new service's **Environment** tab, add:
+   - `SUPABASE_URL` = your Supabase Project URL
+   - `SUPABASE_KEY` = the **service_role** key
+   - `ADMIN_USER` / `ADMIN_PASS` = your admin credentials
+   - `COOKIE_SECURE` is already set to `1` (Render serves HTTPS, so the admin cookie is secure).
+4. Click **Deploy**. Health check is `/api/event`; open the service URL for the public site and `/login.html` for admin.
+
+Manual setup instead of a blueprint: **Root Directory** = `event-pass`,
+**Build Command** = `pip install -r requirements.txt`,
+**Start Command** = `uvicorn main:app --host 0.0.0.0 --port $PORT`, same env vars as above.
+
+> `.env` is ignored by Git and not used on Render — set the values in the Render dashboard.
+> Keep one instance/worker: admin sessions and the Supabase sync state live in process memory.
+> On the free plan the service sleeps after inactivity, so the first request can take a few seconds.
+
 ## Structure
 ```
 main.py                 FastAPI app: API, sessions, static hosting (data/db.json is auto-created)
